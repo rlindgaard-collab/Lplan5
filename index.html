@@ -135,14 +135,11 @@ let extractedText = '';
       actionBtn.textContent='Lav forslag til aktivitet';
 
       summaryBox.textContent='Genererer opsummering...';
-      const arrayBuf = await lastFile.arrayBuffer();
-const pdf = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
-let fullText = '';
-for (let i=1;i<=pdf.numPages;i++){ const page=await pdf.getPage(i); const c=await page.getTextContent(); fullText += c.items.map(it=>it.str).join(' ') + '\n'; }
-extractedText = fullText.slice(0,12000);
-const res = await fetch(`${API_BASE}/opsummering`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${API_KEY}`}, body: JSON.stringify({ text: extractedText }) });
-const data = await res.json();
-summaryBox.innerHTML = (data.summary||'').replace(/\n/g,'<br>');
+      const formData = new FormData();
+      formData.append('pdf', lastFile);
+      const res = await fetch('/summary', { method:'POST', body: formData });
+      const data = await res.json();
+      summaryBox.innerHTML = (data.summary||'').replace(/\n/g,'<br>');
     } else {
       hasFile=false; actionBtn.textContent='Vælg læreplan (PDF)'; fileName.textContent='Ingen fil valgt';
       summaryBox.textContent='[Ingen opsummering endnu]';
@@ -152,9 +149,11 @@ summaryBox.innerHTML = (data.summary||'').replace(/\n/g,'<br>');
   async function generateSuggestion(){
     if(!lastFile) return;
     suggestionDiv.textContent='Genererer forslag...';
-    if(!extractedText){ const arrayBuf = await lastFile.arrayBuffer(); const pdf=await pdfjsLib.getDocument({data:arrayBuf}).promise; let fullText=''; for(let i=1;i<=pdf.numPages;i++){ const page=await pdf.getPage(i); const c=await page.getTextContent(); fullText += c.items.map(it=>it.str).join(' ') + '\n'; } extractedText = fullText.slice(0,12000); }
-const res = await fetch(`${API_BASE}/forslag`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${API_KEY}`}, body: JSON.stringify({ text: extractedText, profile: profileSelect.value }) });
-const data = await res.json();
+    const formData = new FormData();
+    formData.append('pdf', lastFile);
+    formData.append('profile', profileSelect.value);
+    const res = await fetch('/upload', { method:'POST', body: formData });
+    const data = await res.json();
     currentSuggestion=data.suggestion||'';
     suggestionDiv.textContent=currentSuggestion || '[Intet forslag]';
   }

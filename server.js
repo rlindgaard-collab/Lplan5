@@ -1,18 +1,16 @@
-
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
-const OpenAI = require('openai');
 const fs = require('fs');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
-app.use(express.static('public'));
+app.use(express.static('.'));
 app.use(express.json());
 
-console.log("API nøgle fundet:", process.env.OPENAI_API_KEY ? "✅ Ja" : "❌ Nej");
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const SUPABASE_URL = 'https://fjwpfesqfwtozaciphnc.supabase.co/functions/v1';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqd3BmZXNxZnd0b3phY2lwaG5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5Nzg5NDksImV4cCI6MjA3MjU1NDk0OX0.4JaHGc5ISuk7IywOeEbuaHGMBFMLJo3uK2MLFF8S6BE';
 
 app.post('/upload', upload.single('pdf'), async (req, res) => {
   try {
@@ -21,19 +19,18 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
     const text = (pdfData.text || '').slice(0, 12000);
     const profile = req.body.profile || 'Ukendt profil';
 
-    const prompt =
-      'Du er en dansk pædagogisk vejleder. Brug uddannelsesprofilen: \"' + profile + '\" og uddraget af læreplanen nedenfor til at skrive PRÆCIS ét forslag til en konkret læringsaktivitet (6–10 linjer). ' +
-      'Forslaget skal være handlingsanvisende (hvem gør hvad, hvor, hvornår), og afslut med 1–2 sætninger om relation til kompetencemål. Brug ikke overskrifter eller lister – skriv som et kort afsnit.\n\n' +
-      '--- Uddrag af læreplan (kan være ufuldstændigt) ---\n' + text;
-
-    const resp = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7
+    const response = await fetch(`${SUPABASE_URL}/forslag`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      },
+      body: JSON.stringify({ text, profile })
     });
 
-    fs.unlink(req.file.path, ()=>{});
-    res.json({ suggestion: resp.choices?.[0]?.message?.content || '' });
+    const data = await response.json();
+    fs.unlink(req.file.path, () => {});
+    res.json({ suggestion: data.suggestion || '' });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Kunne ikke generere forslag.' });
@@ -46,17 +43,18 @@ app.post('/summary', upload.single('pdf'), async (req, res) => {
     const pdfData = await pdfParse(dataBuffer);
     const text = (pdfData.text || '').slice(0, 12000);
 
-    const prompt =
-      'Opsummer denne læreplan på dansk i 2 korte sætninger efterfulgt af 4–6 punktopstillede hovedpointer. Hold det stramt og praksisnært:\n\n' + text;
-
-    const resp = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.4
+    const response = await fetch(`${SUPABASE_URL}/opsummering`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      },
+      body: JSON.stringify({ text })
     });
 
-    fs.unlink(req.file.path, ()=>{});
-    res.json({ summary: resp.choices?.[0]?.message?.content || '' });
+    const data = await response.json();
+    fs.unlink(req.file.path, () => {});
+    res.json({ summary: data.summary || '' });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Kunne ikke opsummere.' });

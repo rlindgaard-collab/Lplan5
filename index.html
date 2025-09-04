@@ -143,7 +143,6 @@ extractedText = fullText.slice(0,12000);
 const res = await fetch(`${API_BASE}/opsummering`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${API_KEY}`}, body: JSON.stringify({ text: extractedText }) });
 const data = await res.json();
 summaryBox.innerHTML = (data.summary||'').replace(/\n/g,'<br>');
-/g,'<br>');
     } else {
       hasFile=false; actionBtn.textContent='Vælg læreplan (PDF)'; fileName.textContent='Ingen fil valgt';
       summaryBox.textContent='[Ingen opsummering endnu]';
